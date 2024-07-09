@@ -109,10 +109,11 @@ static void mdlOutputs(SimStruct *S, int_T tid)
         }
 
         // get the input port
-        InputRealPtrsType mavlinkMsg = ssGetInputPortRealSignalPtrs(S, 0);
+        InputPtrsType mavlinkMsg = ssGetInputPortSignalPtrs(S, 0);
+        const uint8_T *inputSignal = (const uint8_T *)mavlinkMsg[0];
         
         memset(buffer, 0, 1024);
-        auto bytes = mavlink_msg_to_send_buffer(buffer, (const mavlink_message_t *)mavlinkMsg[0]);
+        auto bytes = mavlink_msg_to_send_buffer(buffer, (const mavlink_message_t *)inputSignal);
         auto sendBytes = socket_->send(asio::buffer(buffer, bytes));
 
         auto recievedBytesLength = socket_->available();
