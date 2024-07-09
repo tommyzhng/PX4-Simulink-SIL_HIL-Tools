@@ -1,8 +1,9 @@
 /*
  * C++ S-Function for PX4 SITL with PX4 Toolbox Integration
- *
  * Copyright (c) 2024 Ziyang Zhang
  */
+#define S_FUNCTION_LEVEL 2
+#define S_FUNCTION_NAME px4_sitl_sfunc
 
 #include <algorithm>
 #include <iostream>
@@ -14,13 +15,11 @@
 #include "mavlink/common/mavlink.h" // MAVLink header
 #include "simstruc.h"
 
-#define S_FUNCTION_LEVEL 2
-#define S_FUNCTION_NAME  px4_sitl_sfunc
+static asio::io_service ioService;
+static asio::ip::tcp::socket socket_(ioService);
+static std::string errorMsg;
+static mavlink_hil_actuator_controls_t hilActuatorControlsMsg;
 
-static asio::io_service io_service;
-static asio::ip::tcp::socket socket(io_service);
-statid std::string status;
-static mavlink_hil_actuator_controls_t hil_actuator_controls;
 
 // Function: mdlInitializeSizes
 // Purpose:  Initialize the sizes array
@@ -50,6 +49,123 @@ static void mdlInitializeSizes(SimStruct *S)
     ssSetNumSampleTimes(S, 1);
     ssSetNumContStates(S, 0);
     ssSetNumDiscStates(S, 0);
+    ssSetNumPWork(S, 2);
 
     ssSetOptions(S, 0);
 }
+
+// Function: mdlInitializeSampleTimes
+// Purpose:  Initialize the sample times array
+
+static void mdlInitializeSampleTimes(SimStruct *S)
+{
+    ssSetSampleTime(S, 0, 0.01);
+    ssSetOffsetTime(S, 0, 0.0);
+    ssSetModelReferenceSampleTimeDefaultInheritance(S);
+}
+
+#define MDL_START
+#if defined(MDL_START)
+// Function: mdlStart
+// Purpose:  Initialize the socket connection to PX4 SITL
+static void mdlStart(SimStruct *S)
+{
+    try
+    {
+        asio::ip::tcp::endpoint endpoint(asio::ip::address::from_string("0.0.0.0"), 4560); // any incoming ip that has port 4560
+        asio::ip::tcp::acceptor acceptor(ioService, endpoint);
+
+        acceptor.accept(socket_);
+        mexPrintf("Connected to PX4 SITL\n");
+        ssSetPWorkValue(S, 0, (void *)&socket_); // store the socket in the PWork vector
+
+        uint8_t *buffer = new uint8_t[1024];
+        buffer = (uint8_t *)calloc(1024, 1);
+        ssSetPWorkValue(S, 1, (void *)buffer); // store the buffer in another PWork vector
+    }
+    catch(const std::exception& e)
+    {
+        // forward error message to Simulink
+        errorMsg = std::string(e.what());
+        ssSetErrorStatus(S, errorMsg.c_str()); 
+    }
+}
+#endif
+
+// Function: mdlOutputs
+// Purpose:  Send the MAVLink message to PX4 SITL
+static void mdlOutputs(SimStruct *S, int_T tid)
+{   
+    try
+    {
+        asio::ip::tcp::socket *socket_ = (asio::ip::tcp::socket *)(ssGetPWorkValue(S, 0));
+        uint8_t *buffer = (uint8_t *)ssGetPWorkValue(S, 1);
+        mavlink_message_t msg;
+
+        if (buffer == NULL || socket_ == NULL)
+        {
+            return;
+        }
+
+        // get the input port
+        InputRealPtrsType mavlinkMsg = ssGetInputPortRealSignalPtrs(S, 0);
+        
+        memset(buffer, 0, 1024);
+        auto bytes = mavlink_msg_to_send_buffer(buffer, (const mavlink_message_t *)mavlinkMsg[0]);
+        auto sendBytes = socket_->send(asio::buffer(buffer, bytes));
+
+        auto recievedBytesLength = socket_->available();
+        if (recievedBytesLength > 0)
+        {
+            memset(buffer, 0, 1024);
+            auto recievedBytes = socket_->receive(asio::buffer(buffer, recievedBytesLength));
+            mavlink_status_t status;
+            for (int i = 0; i < recievedBytesLength; i++)
+            {
+                if (mavlink_parse_char(MAVLINK_COMM_0, buffer[i], &msg, &status))
+                {   
+                    // switch to handle additional messages in the future
+                    switch (msg.msgid) 
+                    {
+                    case MAVLINK_MSG_ID_HIL_ACTUATOR_CONTROLS:
+                        mavlink_msg_hil_actuator_controls_decode(&msg, &hilActuatorControlsMsg);
+                        break;
+                    default:
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    catch (const std::exception &e)
+    {
+        errorMsg = std::string(e.what());
+        ssSetErrorStatus(S, errorMsg.c_str());
+    }
+}
+
+// Function: mdlTerminate
+// Purpose:  Close the socket connection to PX4 SITL
+
+static void mdlTerminate(SimStruct *S)
+{
+
+    asio::ip::tcp::socket *socket_ = (asio::ip::tcp::socket *)ssGetPWorkValue(S, 0);
+    if (socket_)
+    {
+        socket_->close();
+        delete socket_;
+    }
+
+    uint8_t *buffer = (uint8_t *)ssGetPWorkValue(S, 1);
+    if (buffer)
+    {
+        delete buffer;
+    }
+}
+
+#ifdef MATLAB_MEX_FILE
+#include "simulink.c"
+#else
+#include "cg_sfun.h"
+#endif
