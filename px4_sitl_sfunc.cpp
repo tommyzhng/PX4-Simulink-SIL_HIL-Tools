@@ -36,7 +36,8 @@ static void mdlInitializeSizes(SimStruct *S)
         return;
     }
 
-    ssSetInputPortWidth(S, 0, 1);   // serialized MAVLink message from PX4 Toolbox
+    // serialized MAVLink message from PX4 Toolbox: size is 1x146 matrix
+    ssSetInputPortWidth(S, 0, 146);
     ssSetInputPortDirectFeedThrough(S, 0, 1);
 
     if (!ssSetNumOutputPorts(S, 1))
