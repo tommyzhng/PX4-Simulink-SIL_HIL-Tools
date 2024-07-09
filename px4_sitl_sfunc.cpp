@@ -38,6 +38,7 @@ static void mdlInitializeSizes(SimStruct *S)
 
     // serialized MAVLink message from PX4 Toolbox: size is 1x146 matrix
     ssSetInputPortWidth(S, 0, 146);
+    ssSetInputPortDataType(S, 0, SS_UINT8);
     ssSetInputPortDirectFeedThrough(S, 0, 1);
 
     if (!ssSetNumOutputPorts(S, 1))
@@ -45,7 +46,8 @@ static void mdlInitializeSizes(SimStruct *S)
         return;
     }
 
-    ssSetOutputPortWidth(S, 0, 1);
+    ssSetOutputPortWidth(S, 0, 1024);
+    ssSetOutputPortDataType(S, 0, SS_UINT8);
 
     ssSetNumSampleTimes(S, 1);
     ssSetNumContStates(S, 0);
@@ -75,12 +77,13 @@ static void mdlStart(SimStruct *S)
     {
         asio::ip::tcp::endpoint endpoint(asio::ip::address::from_string("0.0.0.0"), 4560); // any incoming ip that has port 4560
         asio::ip::tcp::acceptor acceptor(ioService, endpoint);
+        mexPrintf("Waiting for connection to PX4 SITL\n");
 
         acceptor.accept(socket_);
         mexPrintf("Connected to PX4 SITL\n");
         ssSetPWorkValue(S, 0, (void *)&socket_); // store the socket in the PWork vector
 
-        uint8_t *buffer = new uint8_t[1024];
+        uint8_t *buffer = nullptr;
         buffer = (uint8_t *)calloc(1024, 1);
         ssSetPWorkValue(S, 1, (void *)buffer); // store the buffer in another PWork vector
     }
@@ -150,18 +153,19 @@ static void mdlOutputs(SimStruct *S, int_T tid)
 
 static void mdlTerminate(SimStruct *S)
 {
-
-    asio::ip::tcp::socket *socket_ = (asio::ip::tcp::socket *)ssGetPWorkValue(S, 0);
-    if (socket_)
+    if (ssGetPWork(S) != NULL)
     {
-        socket_->close();
-        delete socket_;
-    }
+        asio::ip::tcp::socket *socket_ = (asio::ip::tcp::socket *)ssGetPWorkValue(S, 0);
+        if (socket_)
+        {
+            socket_->close();
+        }
 
-    uint8_t *buffer = (uint8_t *)ssGetPWorkValue(S, 1);
-    if (buffer)
-    {
-        delete buffer;
+        uint8_t *buffer = (uint8_t *)ssGetPWorkValue(S, 1);
+        if (buffer)
+        {
+            free(buffer);
+        }
     }
 }
 
