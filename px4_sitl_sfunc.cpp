@@ -2,6 +2,7 @@
  * C++ S-Function for PX4 SITL with PX4 Toolbox Integration
  * Copyright (c) 2024 Ziyang Zhang
  */
+
 #define S_FUNCTION_LEVEL 2
 #define S_FUNCTION_NAME px4_sitl_sfunc
 
@@ -11,7 +12,7 @@
 #include <string>
 #include <sstream>
 
-#include <asio.hpp>
+#include <asio.hpp> // ASIO header
 #include "mavlink/common/mavlink.h" // MAVLink header
 #include "simstruc.h"
 
@@ -36,7 +37,6 @@ static void mdlInitializeSizes(SimStruct *S)
         return;
     }
 
-    // set inputs
     // Accel
     ssSetInputPortWidth(S, 0, 3);
     ssSetInputPortDirectFeedThrough(S, 0, 1);
@@ -50,7 +50,7 @@ static void mdlInitializeSizes(SimStruct *S)
     ssSetInputPortWidth(S, 3, 1);
     ssSetInputPortDirectFeedThrough(S, 3, 1);
     // GPS
-    ssSetInputPortWidth(S, 4, 3); // xyz measured
+    ssSetInputPortWidth(S, 4, 3); // lat,long,alt measured
     ssSetInputPortDirectFeedThrough(S, 4, 1);
 
     ssSetInputPortWidth(S, 5, 3); // xyz velocity
@@ -59,10 +59,13 @@ static void mdlInitializeSizes(SimStruct *S)
     ssSetInputPortWidth(S, 6, 1); // Ground Speed
     ssSetInputPortDirectFeedThrough(S, 6, 1);
 
-    
+    ssSetInputPortWidth(S, 7, 1); // Course
+    ssSetInputPortDirectFeedThrough(S, 7, 1);
 
+    // Time
+    ssSetInputPortWidth(S, 8, 1);
+    ssSetInputPortDirectFeedThrough(S, 8, 1);
 
-    
 
     if (!ssSetNumOutputPorts(S, 1))
     {
@@ -93,6 +96,7 @@ static void mdlStart(SimStruct *S)
 {
     try
     {
+        // initialize socket connection to PX4 SITL
         asio::ip::tcp::endpoint endpoint(asio::ip::address::from_string("0.0.0.0"), 4560); // any incoming ip that has port 4560
         asio::ip::tcp::acceptor acceptor(ioService, endpoint);
         mexPrintf("Waiting for connection to PX4 SITL\n");
@@ -100,6 +104,7 @@ static void mdlStart(SimStruct *S)
         mexPrintf("Connected to PX4 SITL\n");
         ssSetPWorkValue(S, 0, (void *)&socket_); // store the socket in the PWork vector
 
+        // initialize buffer to store data
         uint8_t *buffer = nullptr;
         buffer = (uint8_t *)calloc(1024, 1);
         ssSetPWorkValue(S, 1, (void *)buffer); // store the buffer in another PWork vector
@@ -114,11 +119,12 @@ static void mdlStart(SimStruct *S)
 #endif
 
 // Function: mdlOutputs
-// Purpose:  Send the MAVLink message to PX4 SITL
+// Purpose:  Send and recieve mavlink data
 static void mdlOutputs(SimStruct *S, int_T tid)
 {   
     try
-    {
+    {   
+        // get the socket and buffer from the PWork vector
         asio::ip::tcp::socket *socket_ = (asio::ip::tcp::socket *)(ssGetPWorkValue(S, 0));
         uint8_t *buffer = (uint8_t *)ssGetPWorkValue(S, 1);
 
@@ -127,8 +133,16 @@ static void mdlOutputs(SimStruct *S, int_T tid)
             return;
         }
 
-        // get the input port
-        InputRealPtrsType mavlinkMsgSerialized = ssGetInputPortRealSignalPtrs(S, 0);
+        // read the input ports
+        InputRealPtrsType acc = ssGetInputPortRealSignalPtrs(S, 0);
+        InputRealPtrsType gyro = ssGetInputPortRealSignalPtrs(S, 1); 
+        InputRealPtrsType mag = ssGetInputPortRealSignalPtrs(S, 2);
+        InputRealPtrsType baro = ssGetInputPortRealSignalPtrs(S, 3);
+        InputRealPtrsType LLA = ssGetInputPortRealSignalPtrs(S, 4);
+        InputRealPtrsType velocity = ssGetInputPortRealSignalPtrs(S, 5);   
+        InputRealPtrsType gndSpeed = ssGetInputPortRealSignalPtrs(S, 6);
+        InputRealPtrsType course = ssGetInputPortRealSignalPtrs(S, 7);
+        InputRealPtrsType time = ssGetInputPortRealSignalPtrs(S, 8);
         
         // Ensure buffer is properly sized
         memset(buffer, 0, 1024);
@@ -206,6 +220,15 @@ static void mdlTerminate(SimStruct *S)
         {
             free(buffer);
         }
+    }
+}
+
+
+{
+    InputRealPtrsType uPtrs = ssGetInputPortRealSignalPtrs(S, 0);
+    for (int i = 0; i < 16; i++)
+    {
+        hilActuatorControlsMsg->controls[i] = (float)(*uPtrs[i]);
     }
 }
 

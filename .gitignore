@@ -1,0 +1,4 @@
+# simulink mex files
+**/*.mexa64
+**/*.mexmaci64
+**/*.mexw64
