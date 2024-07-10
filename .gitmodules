@@ -1,0 +1,6 @@
+[submodule "include/mavlink"]
+	path = include/mavlink
+	url = https://github.com/mavlink/c_library_v2
+[submodule "include/asio"]
+	path = include/asio
+	url = https://github.com/chriskohlhoff/asio.git
