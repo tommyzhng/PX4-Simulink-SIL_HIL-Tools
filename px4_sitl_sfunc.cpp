@@ -31,29 +31,35 @@ static void mdlInitializeSizes(SimStruct *S)
         return;
     }
 
-    if (!ssSetNumInputPorts(S, 1))
+    if (!ssSetNumInputPorts(S, 3))
     {
         return;
     }
 
-    // serialized MAVLink message from PX4 Toolbox: size is 1x146 matrix
-    ssSetInputPortWidth(S, 0, 146);
+    // serialized MAVLink message from PX4 Toolbox:
+    // 1. Sensor data (GPS, IMU, etc.)
+    ssSetInputPortWidth(S, 0, 76);
     ssSetInputPortDataType(S, 0, SS_UINT8);
     ssSetInputPortDirectFeedThrough(S, 0, 1);
+
+    // 2. GPS data
+    ssSetInputPortWidth(S, 1, 49);
+    ssSetInputPortDataType(S, 1, SS_UINT8);
+    ssSetInputPortDirectFeedThrough(S, 1, 1);
+
+    // 3. Heartbeat
+    ssSetInputPortWidth(S, 2, 21);
+    ssSetInputPortDataType(S, 2, SS_UINT8);
+    ssSetInputPortDirectFeedThrough(S, 2, 1);
 
     if (!ssSetNumOutputPorts(S, 1))
     {
         return;
     }
 
-    ssSetOutputPortWidth(S, 0, 1024);
-    ssSetOutputPortDataType(S, 0, SS_UINT8);
-
+    ssSetOutputPortWidth(S, 0, 16);
     ssSetNumSampleTimes(S, 1);
-    ssSetNumContStates(S, 0);
-    ssSetNumDiscStates(S, 0);
     ssSetNumPWork(S, 2);
-
     ssSetOptions(S, 0);
 }
 
@@ -104,7 +110,6 @@ static void mdlOutputs(SimStruct *S, int_T tid)
     {
         asio::ip::tcp::socket *socket_ = (asio::ip::tcp::socket *)(ssGetPWorkValue(S, 0));
         uint8_t *buffer = (uint8_t *)ssGetPWorkValue(S, 1);
-        mavlink_message_t msg;
 
         if (buffer == NULL || socket_ == NULL)
         {
@@ -112,18 +117,34 @@ static void mdlOutputs(SimStruct *S, int_T tid)
         }
 
         // get the input port
-        InputPtrsType mavlinkMsg = ssGetInputPortSignalPtrs(S, 0);
-        const uint8_T *inputSignal = (const uint8_T *)mavlinkMsg[0];
+        InputRealPtrsType sensorBytes = ssGetInputPortRealSignalPtrs(S, 0);
+        InputRealPtrsType gpsBytes = ssGetInputPortRealSignalPtrs(S, 1);
+        InputRealPtrsType heartbeatBytes = ssGetInputPortRealSignalPtrs(S, 2);
         
+        // Ensure buffer is properly sized
         memset(buffer, 0, 1024);
-        auto bytes = mavlink_msg_to_send_buffer(buffer, (const mavlink_message_t *)inputSignal);
-        auto sendBytes = socket_->send(asio::buffer(buffer, bytes));
 
+        // Ensure correct type casting and pointer arithmetic
+        const uint8_t* sensorPtr = reinterpret_cast<const uint8_t*>(sensorBytes[0]);
+        const uint8_t* gpsPtr = reinterpret_cast<const uint8_t*>(gpsBytes[0]);
+        const uint8_t* heartbeatPtr = reinterpret_cast<const uint8_t*>(heartbeatBytes[0]);
+
+        // directly access the bytes of the input port and copy data
+        std::copy(sensorPtr, sensorPtr + 76, buffer); // sensor data
+        std::copy(gpsPtr, gpsPtr + 49, buffer + 76); // GPS data
+        std::copy(heartbeatPtr, heartbeatPtr + 21, buffer + 125); // heartbeat
+
+        // send the data to PX4 SITL
+        asio::error_code ec;
+        socket_->send(asio::buffer(buffer, 1024), 0, ec);
+        
+        // receive data from PX4 SITL
         auto recievedBytesLength = socket_->available();
         if (recievedBytesLength > 0)
         {
             memset(buffer, 0, 1024);
             auto recievedBytes = socket_->receive(asio::buffer(buffer, recievedBytesLength));
+            mavlink_message_t msg;
             mavlink_status_t status;
             for (int i = 0; i < recievedBytesLength; i++)
             {
@@ -140,6 +161,11 @@ static void mdlOutputs(SimStruct *S, int_T tid)
                     }
                 }
             }
+        }
+        real_T *pwm = ssGetOutputPortRealSignal(S, 0);
+        for (int i = 0; i < 16; i++)
+        {
+            pwm[i] = (real_T)hilActuatorControlsMsg.controls[i];
         }
     }
     catch (const std::exception &e)
