@@ -19,56 +19,61 @@
 static asio::io_service ioService;
 static asio::ip::tcp::socket socket_(ioService);
 static std::string errorMsg;
-static mavlink_hil_actuator_controls_t hilActuatorControlsMsg;
 
+// declare helper functions
+static mavlink_message_t mavlinkMsg;
+static mavlink_hil_actuator_controls_t hilActuatorControlsMsg;
+void CreateHeartbeatMessage(mavlink_heartbeat_t *heartbeatMsg);
+void CreateHILSensorMessage(mavlink_hil_sensor_t *sensorMsg, const real_T* const time_usec, const real_T* const accel, const real_T* const gyro, const real_T* const mag, const real_T* const baro);
+void CreateHILGPSMessage(mavlink_hil_gps_t *gpsMsg, const real_T* const time_usec, const real_T* const LLA, const real_T* const velocity, const real_T* const gndSpeed, const real_T* const course);
 
 // Function: mdlInitializeSizes
 // Purpose:  Initialize the sizes array
 static void mdlInitializeSizes(SimStruct *S)
 {
     ssSetNumSFcnParams(S, 0);
-    if (ssGetNumSFcnParams(S) != ssGetSFcnParamsCount(S))
-    {
+    if (ssGetNumSFcnParams(S) != ssGetSFcnParamsCount(S)){
         return;
     }
-
-    if (!ssSetNumInputPorts(S, 1))
-    {
+    if (!ssSetNumInputPorts(S, 9)){
         return;
     }
 
     // Accel
     ssSetInputPortWidth(S, 0, 3);
     ssSetInputPortDirectFeedThrough(S, 0, 1);
+    ssSetInputPortDataType(S, 0, SS_DOUBLE);
     // Gyro
     ssSetInputPortWidth(S, 1, 3);
     ssSetInputPortDirectFeedThrough(S, 1, 1);
+    ssSetInputPortDataType(S, 1, SS_DOUBLE);
     // Magnetometer
     ssSetInputPortWidth(S, 2, 3);
     ssSetInputPortDirectFeedThrough(S, 2, 1);
+    ssSetInputPortDataType(S, 2, SS_DOUBLE);
     // Barometer
     ssSetInputPortWidth(S, 3, 1);
     ssSetInputPortDirectFeedThrough(S, 3, 1);
+    ssSetInputPortDataType(S, 3, SS_DOUBLE);
     // GPS
     ssSetInputPortWidth(S, 4, 3); // lat,long,alt measured
     ssSetInputPortDirectFeedThrough(S, 4, 1);
-
+    ssSetInputPortDataType(S, 4, SS_DOUBLE);
     ssSetInputPortWidth(S, 5, 3); // xyz velocity
     ssSetInputPortDirectFeedThrough(S, 5, 1);
-
+    ssSetInputPortDataType(S, 5, SS_DOUBLE);
     ssSetInputPortWidth(S, 6, 1); // Ground Speed
     ssSetInputPortDirectFeedThrough(S, 6, 1);
-
+    ssSetInputPortDataType(S, 6, SS_DOUBLE);
     ssSetInputPortWidth(S, 7, 1); // Course
     ssSetInputPortDirectFeedThrough(S, 7, 1);
-
+    ssSetInputPortDataType(S, 7, SS_DOUBLE);
     // Time
     ssSetInputPortWidth(S, 8, 1);
     ssSetInputPortDirectFeedThrough(S, 8, 1);
+    ssSetInputPortDataType(S, 8, SS_DOUBLE);
 
-
-    if (!ssSetNumOutputPorts(S, 1))
-    {
+    if (!ssSetNumOutputPorts(S, 1)){
         return;
     }
 
@@ -94,8 +99,7 @@ static void mdlInitializeSampleTimes(SimStruct *S)
 // Purpose:  Initialize the socket connection to PX4 SITL
 static void mdlStart(SimStruct *S)
 {
-    try
-    {
+    try{
         // initialize socket connection to PX4 SITL
         asio::ip::tcp::endpoint endpoint(asio::ip::address::from_string("0.0.0.0"), 4560); // any incoming ip that has port 4560
         asio::ip::tcp::acceptor acceptor(ioService, endpoint);
@@ -109,8 +113,7 @@ static void mdlStart(SimStruct *S)
         buffer = (uint8_t *)calloc(1024, 1);
         ssSetPWorkValue(S, 1, (void *)buffer); // store the buffer in another PWork vector
     }
-    catch(const std::exception& e)
-    {
+    catch(const std::exception& e){
         // forward error message to Simulink
         errorMsg = std::string(e.what());
         ssSetErrorStatus(S, errorMsg.c_str()); 
@@ -122,14 +125,12 @@ static void mdlStart(SimStruct *S)
 // Purpose:  Send and recieve mavlink data
 static void mdlOutputs(SimStruct *S, int_T tid)
 {   
-    try
-    {   
+    try{   
         // get the socket and buffer from the PWork vector
         asio::ip::tcp::socket *socket_ = (asio::ip::tcp::socket *)(ssGetPWorkValue(S, 0));
         uint8_t *buffer = (uint8_t *)ssGetPWorkValue(S, 1);
 
-        if (buffer == NULL || socket_ == NULL)
-        {
+        if (buffer == NULL || socket_ == NULL){
             return;
         }
 
@@ -142,61 +143,53 @@ static void mdlOutputs(SimStruct *S, int_T tid)
         InputRealPtrsType velocity = ssGetInputPortRealSignalPtrs(S, 5);   
         InputRealPtrsType gndSpeed = ssGetInputPortRealSignalPtrs(S, 6);
         InputRealPtrsType course = ssGetInputPortRealSignalPtrs(S, 7);
-        InputRealPtrsType time = ssGetInputPortRealSignalPtrs(S, 8);
+        InputRealPtrsType time_ = ssGetInputPortRealSignalPtrs(S, 8);
         
-        // Ensure buffer is properly sized
+        // send data to PX4 SITL
         memset(buffer, 0, 1024);
-        mavlink_message_t msg;
-        msg.magic = 51;
-        msg.len = 146;
-        msg.seq = 0;
-        msg.sysid = 2;
-        msg.compid = 51;
-        msg.msgid = 93;
-        for (int i = 0; i < 146; i++)
-        {
-            int blockIndex = i / 8;
-            int byteOffset = i % 8;
-            // Shift the byte to the correct position and OR it into the correct block
-            msg.payload64[blockIndex] |= static_cast<uint64_t>(*mavlinkMsgSerialized[i]) << (byteOffset * 8);
-        }
 
+        // create heartbeat message
+        mavlink_heartbeat_t heartbeat_msg;
+        CreateHeartbeatMessage(&heartbeat_msg);
+        mavlink_msg_heartbeat_encode_chan(1, 200, MAVLINK_COMM_0, &mavlinkMsg, &heartbeat_msg);
+        auto sendBytesLength = mavlink_msg_to_send_buffer(&buffer[0], &mavlinkMsg);
+
+        // create HIL_SENSOR message
+        mavlink_hil_sensor_t hil_sensor_msg;
+        CreateHILSensorMessage(&hil_sensor_msg, time_[0], acc[0], gyro[0], mag[0], baro[0]);
+        mavlink_msg_hil_sensor_encode_chan(1, 200, MAVLINK_COMM_0, &mavlinkMsg, &hil_sensor_msg);
+        sendBytesLength += mavlink_msg_to_send_buffer(&buffer[sendBytesLength], &mavlinkMsg);
+
+        // create HIL_GPS message
+        mavlink_hil_gps_t hil_gps_msg;
+        CreateHILGPSMessage(&hil_gps_msg, time_[0], LLA[0], velocity[0], gndSpeed[0], course[0]);
+        mavlink_msg_hil_gps_encode_chan(1, 200, MAVLINK_COMM_0, &mavlinkMsg, &hil_gps_msg);
+        sendBytesLength += mavlink_msg_to_send_buffer(&buffer[sendBytesLength], &mavlinkMsg);
 
         // send the data to PX4 SITL
-        socket_->send(asio::buffer(buffer, 146));
+        socket_->send(asio::buffer(buffer, sendBytesLength));
         
         // receive data from PX4 SITL
-        auto recievedBytesLength = socket_->available();
-        if (recievedBytesLength > 0)
-        {
+        uint8_t recievedBytesLength = socket_->available();
+        if (recievedBytesLength > 0){
             memset(buffer, 0, 1024);
             auto recievedBytes = socket_->receive(asio::buffer(buffer, recievedBytesLength));
             mavlink_message_t msg;
             mavlink_status_t status;
-            for (int i = 0; i < recievedBytesLength; i++)
-            {
-                if (mavlink_parse_char(MAVLINK_COMM_0, buffer[i], &msg, &status))
-                {   
-                    // switch to handle additional messages in the future
-                    switch (msg.msgid) 
-                    {
-                    case MAVLINK_MSG_ID_HIL_ACTUATOR_CONTROLS:
+            for (int i = 0; i < recievedBytesLength; i++){
+                if (mavlink_parse_char(MAVLINK_COMM_0, buffer[i], &msg, &status)){   
+                    if (msg.msgid == MAVLINK_MSG_ID_HIL_ACTUATOR_CONTROLS){
                         mavlink_msg_hil_actuator_controls_decode(&msg, &hilActuatorControlsMsg);
-                        break;
-                    default:
-                        break;
                     }
                 }
             }
         }
-        real_T *pwm = ssGetOutputPortRealSignal(S, 0);
-        for (int i = 0; i < 16; i++)
-        {
+        real_T *pwm = ssGetOutputPortRealSignal(S, 0); 
+        for (int i = 0; i < 16; i++){
             pwm[i] = (real_T)hilActuatorControlsMsg.controls[i];
         }
     }
-    catch (const std::exception &e)
-    {
+    catch (const std::exception &e){
         errorMsg = std::string(e.what());
         ssSetErrorStatus(S, errorMsg.c_str());
     }
@@ -207,29 +200,72 @@ static void mdlOutputs(SimStruct *S, int_T tid)
 
 static void mdlTerminate(SimStruct *S)
 {
-    if (ssGetPWork(S) != NULL)
-    {
+    if (ssGetPWork(S) != NULL){
         asio::ip::tcp::socket *socket_ = (asio::ip::tcp::socket *)ssGetPWorkValue(S, 0);
-        if (socket_)
-        {
+        if (socket_){
             socket_->close();
         }
 
         uint8_t *buffer = (uint8_t *)ssGetPWorkValue(S, 1);
-        if (buffer)
-        {
+        if (buffer){
             free(buffer);
         }
     }
 }
 
+// Helper functions to create mavlink messages
 
+// Function CreateHeartbeatMessage
+// Purpose:  Title is pretty self-explanatory
+void CreateHeartbeatMessage(mavlink_heartbeat_t *heartbeatMsg)
 {
-    InputRealPtrsType uPtrs = ssGetInputPortRealSignalPtrs(S, 0);
-    for (int i = 0; i < 16; i++)
-    {
-        hilActuatorControlsMsg->controls[i] = (float)(*uPtrs[i]);
-    }
+    heartbeatMsg->autopilot = (uint8_t)MAV_AUTOPILOT_GENERIC;
+    heartbeatMsg->type = (uint8_t)MAV_TYPE_GENERIC;
+    heartbeatMsg->system_status = (uint8_t)0;
+    heartbeatMsg->base_mode = (uint8_t)0;
+    heartbeatMsg->custom_mode = (uint32_t)0;
+}
+
+// Function: CreateHILSensorMessage
+// Purpose:  Title is pretty self-explanatory
+void CreateHILSensorMessage(mavlink_hil_sensor_t *sensorMsg, const real_T* const time_usec, const real_T* const accel, const real_T* const gyro, const real_T* const mag, const real_T* const baro)
+{
+    sensorMsg->time_usec = (uint64_t)((time_usec[0]) * 1e6);
+    sensorMsg->xacc = (float)accel[0];
+    sensorMsg->yacc = (float)accel[1];
+    sensorMsg->zacc = (float)accel[2];
+    sensorMsg->xgyro = (float)gyro[0];
+    sensorMsg->ygyro = (float)gyro[1];
+    sensorMsg->zgyro = (float)gyro[2];
+    sensorMsg->xmag = (float)mag[0]*0.01;
+    sensorMsg->ymag = (float)mag[1]*0.01;
+    sensorMsg->zmag = (float)mag[2]*0.01;
+    sensorMsg->abs_pressure = (float)baro[0];
+    sensorMsg->diff_pressure = (float)0;
+    sensorMsg->temperature = (float)25;
+    sensorMsg->fields_updated = (uint32_t)0x1FFF; // all fields are updated
+    sensorMsg->id = (uint8_t)0;
+}
+
+// Function: CreateHILGPSMessage
+// Purpose:  Title is pretty self-explanatory
+void CreateHILGPSMessage(mavlink_hil_gps_t *gpsMsg, const real_T* const time_usec, const real_T* const LLA, const real_T* const velocity, const real_T* const gndSpeed, const real_T* const course)
+{
+    gpsMsg->time_usec = (uint64_t)((time_usec[0]) * 1e6);
+    gpsMsg->lat = (int32_t)(LLA[0] * 1e7);
+    gpsMsg->lon = (int32_t)(LLA[1] * 1e7);
+    gpsMsg->alt = (int32_t)(LLA[2] * 1e3);
+    gpsMsg->eph = (uint16_t)300;                    // hdop of 1.0
+    gpsMsg->epv = (uint16_t)400;
+    gpsMsg->vel = (uint16_t)(velocity[0] * 100);    // cm/s for vel
+    gpsMsg->vn = (int16_t)(velocity[0] * 100);
+    gpsMsg->ve = (int16_t)(velocity[1] * 100);
+    gpsMsg->vd = (int16_t)(velocity[2] * 100);
+    gpsMsg->cog = (uint16_t)(course[0] * 100);      
+    gpsMsg->fix_type = (uint8_t)3;                  // 3D fix
+    gpsMsg->satellites_visible = (uint8_t)10;
+    gpsMsg->id = (uint8_t)0;
+    gpsMsg->yaw = (uint16_t)0;
 }
 
 #ifdef MATLAB_MEX_FILE
