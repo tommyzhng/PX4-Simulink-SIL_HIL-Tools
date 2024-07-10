@@ -31,26 +31,38 @@ static void mdlInitializeSizes(SimStruct *S)
         return;
     }
 
-    if (!ssSetNumInputPorts(S, 3))
+    if (!ssSetNumInputPorts(S, 1))
     {
         return;
     }
 
-    // serialized MAVLink message from PX4 Toolbox:
-    // 1. Sensor data (GPS, IMU, etc.)
-    ssSetInputPortWidth(S, 0, 76);
-    ssSetInputPortDataType(S, 0, SS_UINT8);
+    // set inputs
+    // Accel
+    ssSetInputPortWidth(S, 0, 3);
     ssSetInputPortDirectFeedThrough(S, 0, 1);
-
-    // 2. GPS data
-    ssSetInputPortWidth(S, 1, 49);
-    ssSetInputPortDataType(S, 1, SS_UINT8);
+    // Gyro
+    ssSetInputPortWidth(S, 1, 3);
     ssSetInputPortDirectFeedThrough(S, 1, 1);
-
-    // 3. Heartbeat
-    ssSetInputPortWidth(S, 2, 21);
-    ssSetInputPortDataType(S, 2, SS_UINT8);
+    // Magnetometer
+    ssSetInputPortWidth(S, 2, 3);
     ssSetInputPortDirectFeedThrough(S, 2, 1);
+    // Barometer
+    ssSetInputPortWidth(S, 3, 1);
+    ssSetInputPortDirectFeedThrough(S, 3, 1);
+    // GPS
+    ssSetInputPortWidth(S, 4, 3); // xyz measured
+    ssSetInputPortDirectFeedThrough(S, 4, 1);
+
+    ssSetInputPortWidth(S, 5, 3); // xyz velocity
+    ssSetInputPortDirectFeedThrough(S, 5, 1);
+
+    ssSetInputPortWidth(S, 6, 1); // Ground Speed
+    ssSetInputPortDirectFeedThrough(S, 6, 1);
+
+    
+
+
+    
 
     if (!ssSetNumOutputPorts(S, 1))
     {
@@ -68,7 +80,7 @@ static void mdlInitializeSizes(SimStruct *S)
 
 static void mdlInitializeSampleTimes(SimStruct *S)
 {
-    ssSetSampleTime(S, 0, 0.01);
+    ssSetSampleTime(S, 0, 0.004);
     ssSetOffsetTime(S, 0, 0.0);
     ssSetModelReferenceSampleTimeDefaultInheritance(S);
 }
@@ -84,7 +96,6 @@ static void mdlStart(SimStruct *S)
         asio::ip::tcp::endpoint endpoint(asio::ip::address::from_string("0.0.0.0"), 4560); // any incoming ip that has port 4560
         asio::ip::tcp::acceptor acceptor(ioService, endpoint);
         mexPrintf("Waiting for connection to PX4 SITL\n");
-
         acceptor.accept(socket_);
         mexPrintf("Connected to PX4 SITL\n");
         ssSetPWorkValue(S, 0, (void *)&socket_); // store the socket in the PWork vector
@@ -117,26 +128,28 @@ static void mdlOutputs(SimStruct *S, int_T tid)
         }
 
         // get the input port
-        InputRealPtrsType sensorBytes = ssGetInputPortRealSignalPtrs(S, 0);
-        InputRealPtrsType gpsBytes = ssGetInputPortRealSignalPtrs(S, 1);
-        InputRealPtrsType heartbeatBytes = ssGetInputPortRealSignalPtrs(S, 2);
+        InputRealPtrsType mavlinkMsgSerialized = ssGetInputPortRealSignalPtrs(S, 0);
         
         // Ensure buffer is properly sized
         memset(buffer, 0, 1024);
+        mavlink_message_t msg;
+        msg.magic = 51;
+        msg.len = 146;
+        msg.seq = 0;
+        msg.sysid = 2;
+        msg.compid = 51;
+        msg.msgid = 93;
+        for (int i = 0; i < 146; i++)
+        {
+            int blockIndex = i / 8;
+            int byteOffset = i % 8;
+            // Shift the byte to the correct position and OR it into the correct block
+            msg.payload64[blockIndex] |= static_cast<uint64_t>(*mavlinkMsgSerialized[i]) << (byteOffset * 8);
+        }
 
-        // Ensure correct type casting and pointer arithmetic
-        const uint8_t* sensorPtr = reinterpret_cast<const uint8_t*>(sensorBytes[0]);
-        const uint8_t* gpsPtr = reinterpret_cast<const uint8_t*>(gpsBytes[0]);
-        const uint8_t* heartbeatPtr = reinterpret_cast<const uint8_t*>(heartbeatBytes[0]);
-
-        // directly access the bytes of the input port and copy data
-        std::copy(sensorPtr, sensorPtr + 76, buffer); // sensor data
-        std::copy(gpsPtr, gpsPtr + 49, buffer + 76); // GPS data
-        std::copy(heartbeatPtr, heartbeatPtr + 21, buffer + 125); // heartbeat
 
         // send the data to PX4 SITL
-        asio::error_code ec;
-        socket_->send(asio::buffer(buffer, 1024), 0, ec);
+        socket_->send(asio::buffer(buffer, 146));
         
         // receive data from PX4 SITL
         auto recievedBytesLength = socket_->available();
