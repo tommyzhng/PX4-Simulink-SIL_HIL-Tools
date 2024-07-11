@@ -1,4 +1,9 @@
-# simulink mex files
-**/*.mexa64
-**/*.mexmaci64
-**/*.mexw64
+# matlab & simulink
+**/*.mat
+**/*.xml
+**/*.slxc
+slprj/
+
+# vscode
+.vscode/
+*.code-workspace

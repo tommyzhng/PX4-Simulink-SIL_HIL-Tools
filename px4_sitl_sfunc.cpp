@@ -1,5 +1,5 @@
 /*
- * C++ S-Function for PX4 SITL with PX4 Toolbox Integration
+ * C++ S-Function for PX4 SITL with Mavlink Conversions
  * Copyright (c) 2024 Ziyang Zhang
  */
 
@@ -166,7 +166,7 @@ static void mdlOutputs(SimStruct *S, int_T tid)
         mavlink_msg_hil_gps_encode_chan(1, 200, MAVLINK_COMM_0, &mavlinkMsg, &hil_gps_msg);
         sendBytesLength += mavlink_msg_to_send_buffer(&buffer[sendBytesLength], &mavlinkMsg);
 
-        // send the data to PX4 SITL
+        // send the data
         socket_->send(asio::buffer(buffer, sendBytesLength));
         
         // receive data from PX4 SITL
@@ -237,10 +237,10 @@ void CreateHILSensorMessage(mavlink_hil_sensor_t *sensorMsg, const real_T* const
     sensorMsg->xgyro = (float)gyro[0];
     sensorMsg->ygyro = (float)gyro[1];
     sensorMsg->zgyro = (float)gyro[2];
-    sensorMsg->xmag = (float)mag[0]*0.01;
+    sensorMsg->xmag = (float)mag[0]*0.01;           // uT to Gauss
     sensorMsg->ymag = (float)mag[1]*0.01;
     sensorMsg->zmag = (float)mag[2]*0.01;
-    sensorMsg->abs_pressure = (float)baro[0];
+    sensorMsg->abs_pressure = (float)baro[0]*0.01;  // Pa to hPa
     sensorMsg->diff_pressure = (float)0;
     sensorMsg->temperature = (float)25;
     sensorMsg->fields_updated = (uint32_t)0x1FFF; // all fields are updated
@@ -252,12 +252,12 @@ void CreateHILSensorMessage(mavlink_hil_sensor_t *sensorMsg, const real_T* const
 void CreateHILGPSMessage(mavlink_hil_gps_t *gpsMsg, const real_T* const time_usec, const real_T* const LLA, const real_T* const velocity, const real_T* const gndSpeed, const real_T* const course)
 {
     gpsMsg->time_usec = (uint64_t)((time_usec[0]) * 1e6);
-    gpsMsg->lat = (int32_t)(LLA[0] * 1e7);
-    gpsMsg->lon = (int32_t)(LLA[1] * 1e7);
-    gpsMsg->alt = (int32_t)(LLA[2] * 1e3);
+    gpsMsg->lat = (int32_t)(LLA[0] * 1e7);          // degE7
+    gpsMsg->lon = (int32_t)(LLA[1] * 1e7);          // degE7
+    gpsMsg->alt = (int32_t)(LLA[2] * 1e3);          // cm
     gpsMsg->eph = (uint16_t)300;                    // hdop of 1.0
     gpsMsg->epv = (uint16_t)400;
-    gpsMsg->vel = (uint16_t)(velocity[0] * 100);    // cm/s for vel
+    gpsMsg->vel = (uint16_t)(velocity[0] * 100);    // cm/s for all vel
     gpsMsg->vn = (int16_t)(velocity[0] * 100);
     gpsMsg->ve = (int16_t)(velocity[1] * 100);
     gpsMsg->vd = (int16_t)(velocity[2] * 100);
