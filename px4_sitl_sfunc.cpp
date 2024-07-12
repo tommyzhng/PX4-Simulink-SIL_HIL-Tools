@@ -26,6 +26,7 @@ static mavlink_hil_actuator_controls_t hilActuatorControlsMsg;
 void CreateHeartbeatMessage(mavlink_heartbeat_t *heartbeatMsg);
 void CreateHILSensorMessage(mavlink_hil_sensor_t *sensorMsg, const real_T* const time_usec, const real_T* const accel, const real_T* const gyro, const real_T* const mag, const real_T* const baro);
 void CreateHILGPSMessage(mavlink_hil_gps_t *gpsMsg, const real_T* const time_usec, const real_T* const LLA, const real_T* const velocity, const real_T* const gndSpeed, const real_T* const course);
+void CreateRCInputsMessage(mavlink_hil_rc_inputs_raw_t *rcMsg, const real_T* const time_usec, const real_T* const rc);
 
 // Function: mdlInitializeSizes
 // Purpose:  Initialize the sizes array
@@ -35,7 +36,7 @@ static void mdlInitializeSizes(SimStruct *S)
     if (ssGetNumSFcnParams(S) != ssGetSFcnParamsCount(S)){
         return;
     }
-    if (!ssSetNumInputPorts(S, 9)){
+    if (!ssSetNumInputPorts(S, 10)){
         return;
     }
 
@@ -68,10 +69,14 @@ static void mdlInitializeSizes(SimStruct *S)
     ssSetInputPortWidth(S, 7, 1); // Course
     ssSetInputPortDirectFeedThrough(S, 7, 1);
     ssSetInputPortDataType(S, 7, SS_DOUBLE);
-    // Time
-    ssSetInputPortWidth(S, 8, 1);
+    // RC
+    ssSetInputPortWidth(S, 8, 4); // 4 channels
     ssSetInputPortDirectFeedThrough(S, 8, 1);
     ssSetInputPortDataType(S, 8, SS_DOUBLE);
+    // Time
+    ssSetInputPortWidth(S, 9, 1);
+    ssSetInputPortDirectFeedThrough(S, 9, 1);
+    ssSetInputPortDataType(S, 9, SS_DOUBLE);
 
     if (!ssSetNumOutputPorts(S, 1)){
         return;
@@ -143,7 +148,8 @@ static void mdlOutputs(SimStruct *S, int_T tid)
         InputRealPtrsType velocity = ssGetInputPortRealSignalPtrs(S, 5);   
         InputRealPtrsType gndSpeed = ssGetInputPortRealSignalPtrs(S, 6);
         InputRealPtrsType course = ssGetInputPortRealSignalPtrs(S, 7);
-        InputRealPtrsType time_ = ssGetInputPortRealSignalPtrs(S, 8);
+        InputRealPtrsType rc = ssGetInputPortRealSignalPtrs(S, 8);
+        InputRealPtrsType time_ = ssGetInputPortRealSignalPtrs(S, 9);
         
         // send data to PX4 SITL
         memset(buffer, 0, 1024);
@@ -164,6 +170,12 @@ static void mdlOutputs(SimStruct *S, int_T tid)
         mavlink_hil_gps_t hil_gps_msg;
         CreateHILGPSMessage(&hil_gps_msg, time_[0], LLA[0], velocity[0], gndSpeed[0], course[0]);
         mavlink_msg_hil_gps_encode_chan(1, 200, MAVLINK_COMM_0, &mavlinkMsg, &hil_gps_msg);
+        sendBytesLength += mavlink_msg_to_send_buffer(&buffer[sendBytesLength], &mavlinkMsg);
+
+        // create HIL_RC_INPUTS_RAW message
+        mavlink_hil_rc_inputs_raw_t hil_rc_msg;
+        CreateRCInputsMessage(&hil_rc_msg, time_[0], rc[0]);
+        mavlink_msg_hil_rc_inputs_raw_encode_chan(1, 200, MAVLINK_COMM_0, &mavlinkMsg, &hil_rc_msg);
         sendBytesLength += mavlink_msg_to_send_buffer(&buffer[sendBytesLength], &mavlinkMsg);
 
         // send the data
@@ -267,6 +279,27 @@ void CreateHILGPSMessage(mavlink_hil_gps_t *gpsMsg, const real_T* const time_use
     gpsMsg->id = (uint8_t)0;
     gpsMsg->yaw = (uint16_t)0;
 }
+
+// Function: CreateRCInputsMessage
+// Purpose: Title is pretty self-explanatory
+void CreateRCInputsMessage(mavlink_hil_rc_inputs_raw_t *rcMsg, const real_T* const time_usec, const real_T* const rc)
+{
+    rcMsg->time_usec = (uint64_t)((time_usec[0]) * 1e6);
+    rcMsg->chan1_raw = (uint16_t)rc[0];
+    rcMsg->chan2_raw = (uint16_t)rc[1];
+    rcMsg->chan3_raw = (uint16_t)rc[2];
+    rcMsg->chan4_raw = (uint16_t)rc[3];
+    rcMsg->chan5_raw = (uint16_t)1000;
+    rcMsg->chan6_raw = (uint16_t)1000;
+    rcMsg->chan7_raw = (uint16_t)1000;
+    rcMsg->chan8_raw = (uint16_t)1000;
+    rcMsg->chan9_raw = (uint16_t)1000;
+    rcMsg->chan10_raw = (uint16_t)1000;
+    rcMsg->chan11_raw = (uint16_t)1000;
+    rcMsg->chan12_raw = (uint16_t)1000;
+    rcMsg->rssi = (uint8_t)255;   
+}
+
 
 #ifdef MATLAB_MEX_FILE
 #include "simulink.c"
