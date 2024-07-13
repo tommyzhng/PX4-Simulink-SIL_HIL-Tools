@@ -1,5 +1,7 @@
 # PX4-Toolbox-SITL-SFunction
 
+(under development - examples coming soon)
+
 This repository contains the S-Function CPP and header files for interfacing simulink with PX4 SITL. The S-Function takes in a few parameters from the simulink model and packages them into a MAVlink message that is sent over TCP port 4560 (see [PX4 simulation website](https://docs.px4.io/main/en/simulation/#default-px4-mavlink-udp-ports)) and allows for custom dynamics to be tested and integrated with other frameworks such as ROS.
 
 ## Required from Simulink
