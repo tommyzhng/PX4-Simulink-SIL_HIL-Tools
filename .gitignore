@@ -2,7 +2,9 @@
 **/*.mat
 **/*.xml
 **/*.slxc
-slprj/
+**/*.slprj
+/slprj
+*.slx
 
 # vscode
 .vscode/
