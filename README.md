@@ -2,7 +2,7 @@
 
 This repository contains the S-Function CPP and header files for interfacing simulink with PX4 SITL. The S-Function takes in a few parameters from the simulink model and packages them into a MAVlink message that is sent over TCP port 4560 (see PX4 simulation website) and allows for custom dynamics to be tested and integrated with other frameworks such as ROS.
 
-## Required from Simulnk
+## Required from Simulink
 
 * IMU (acc_x, acc_y, acc_z) [m/s^2]
 * Gyro (gyro_x, gyro_y, gyro_z)
@@ -16,8 +16,10 @@ This repository contains the S-Function CPP and header files for interfacing sim
 ## Installation
 
 1. Clone this repo into the root folder of your dynamics model.
-2. Build the cpp file with the build.m file and replace your matlab install location.
-3. Connect the inputs from your model and output to a rate controller and selector block. (Currently working on a way to bypass further processing in simulink)
+2. git submodule init
+3. git submodule update --recursive --remote
+4. Build the cpp file with the build.m file and replace your matlab install location.
+5. Connect the inputs from your model and output to a rate controller and selector block. (Currently working on a way to bypass further processing in simulink)
 
 
 ## Running the simulation
