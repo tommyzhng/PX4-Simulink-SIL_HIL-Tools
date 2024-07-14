@@ -19,8 +19,8 @@ This repository contains the S-Function CPP and header files for interfacing sim
 2. git submodule init
 3. git submodule update --recursive --remote
 4. Build the cpp file with the build.m file and replace your matlab install location.
-5. Connect the inputs from your model and output to a rate controller and selector block. (Currently working on a way to bypass further processing in simulink)
-
+5. Connect the inputs from your model to the S-Function
+6. Connect the output from the S-Function to a rate controller, selector block (# of motors) and a saturation from 0-1 (will add as block in the future).
 
 ## Running the simulation
 
