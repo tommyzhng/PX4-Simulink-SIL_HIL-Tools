@@ -36,7 +36,7 @@ static void mdlInitializeSizes(SimStruct *S)
     if (ssGetNumSFcnParams(S) != ssGetSFcnParamsCount(S)){
         return;
     }
-    if (!ssSetNumInputPorts(S, 10)){
+    if (!ssSetNumInputPorts(S, 9)){
         return;
     }
 
@@ -69,14 +69,14 @@ static void mdlInitializeSizes(SimStruct *S)
     ssSetInputPortWidth(S, 7, 1); // Course
     ssSetInputPortDirectFeedThrough(S, 7, 1);
     ssSetInputPortDataType(S, 7, SS_DOUBLE);
-    // Time
-    ssSetInputPortWidth(S, 8, 1);
-    ssSetInputPortDirectFeedThrough(S, 9, 1);
-    ssSetInputPortDataType(S, 9, SS_DOUBLE);
     // RC
     // ssSetInputPortWidth(S, 8, 4); // 4 channels
     // ssSetInputPortDirectFeedThrough(S, 8, 1);
     // ssSetInputPortDataType(S, 8, SS_DOUBLE);
+    // Time
+    ssSetInputPortWidth(S, 8, 1);
+    ssSetInputPortDirectFeedThrough(S, 8, 1);
+    ssSetInputPortDataType(S, 8, SS_DOUBLE);
 
     if (!ssSetNumOutputPorts(S, 1)){
         return;
@@ -148,8 +148,8 @@ static void mdlOutputs(SimStruct *S, int_T tid)
         InputRealPtrsType velocity = ssGetInputPortRealSignalPtrs(S, 5);   
         InputRealPtrsType gndSpeed = ssGetInputPortRealSignalPtrs(S, 6);
         InputRealPtrsType course = ssGetInputPortRealSignalPtrs(S, 7);
+        // InputRealPtrsType rc = ssGetInputPortRealSignalPtrs(S, 8);
         InputRealPtrsType time_ = ssGetInputPortRealSignalPtrs(S, 8);
-        // InputRealPtrsType rc = ssGetInputPortRealSignalPtrs(S, 9);
         
         // send data to PX4 SITL
         memset(buffer, 0, 1024);

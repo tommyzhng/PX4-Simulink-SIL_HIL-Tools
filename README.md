@@ -1,5 +1,7 @@
 # PX4-Toolbox-SITL-SFunction
 
+(under development - examples coming soon)
+
 This repository contains the S-Function CPP and header files for interfacing simulink with PX4 SITL. The S-Function takes in a few parameters from the simulink model and packages them into a MAVlink message that is sent over TCP port 4560 (see [PX4 simulation website](https://docs.px4.io/main/en/simulation/#default-px4-mavlink-udp-ports)) and allows for custom dynamics to be tested and integrated with other frameworks such as ROS.
 
 ## Required from Simulink
@@ -26,6 +28,7 @@ This repository contains the S-Function CPP and header files for interfacing sim
 
 1. Run the simulink model.
 2. In your WSL environment run: export PX4_SIM_HOSTNAME="windows ip address"
-3. Open QGC and connect to port 18570  
+3. In your WSL environment run: make px4_sitl none_iris
+4. Open QGC and connect to port 18570  
 ![alt text](QGCsetup.png)  
 5. If you want to connect ROS to the sitl: roslaunch mavros px4.launch fcu_url:=udp://:14540@"windows ip":14550
