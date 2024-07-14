@@ -282,23 +282,23 @@ void CreateHILGPSMessage(mavlink_hil_gps_t *gpsMsg, const real_T* const time_use
 
 // Function: CreateRCInputsMessage
 // Purpose: Title is pretty self-explanatory
-void CreateRCInputsMessage(mavlink_hil_rc_inputs_raw_t *rcMsg, const real_T* const time_usec, const real_T* const rc)
-{
-    rcMsg->time_usec = (uint64_t)((time_usec[0]) * 1e6);
-    rcMsg->chan1_raw = (uint16_t)rc[0];
-    rcMsg->chan2_raw = (uint16_t)rc[1];
-    rcMsg->chan3_raw = (uint16_t)rc[2];
-    rcMsg->chan4_raw = (uint16_t)rc[3];
-    rcMsg->chan5_raw = (uint16_t)1000;
-    rcMsg->chan6_raw = (uint16_t)1000;
-    rcMsg->chan7_raw = (uint16_t)1000;
-    rcMsg->chan8_raw = (uint16_t)1000;
-    rcMsg->chan9_raw = (uint16_t)1000;
-    rcMsg->chan10_raw = (uint16_t)1000;
-    rcMsg->chan11_raw = (uint16_t)1000;
-    rcMsg->chan12_raw = (uint16_t)1000;
-    rcMsg->rssi = (uint8_t)255;   
-}
+// void CreateRCInputsMessage(mavlink_hil_rc_inputs_raw_t *rcMsg, const real_T* const time_usec, const real_T* const rc)
+// {
+//     rcMsg->time_usec = (uint64_t)((time_usec[0]) * 1e6);
+//     rcMsg->chan1_raw = (uint16_t)rc[0];
+//     rcMsg->chan2_raw = (uint16_t)rc[1];
+//     rcMsg->chan3_raw = (uint16_t)rc[2];
+//     rcMsg->chan4_raw = (uint16_t)rc[3];
+//     rcMsg->chan5_raw = (uint16_t)1000;
+//     rcMsg->chan6_raw = (uint16_t)1000;
+//     rcMsg->chan7_raw = (uint16_t)1000;
+//     rcMsg->chan8_raw = (uint16_t)1000;
+//     rcMsg->chan9_raw = (uint16_t)1000;
+//     rcMsg->chan10_raw = (uint16_t)1000;
+//     rcMsg->chan11_raw = (uint16_t)1000;
+//     rcMsg->chan12_raw = (uint16_t)1000;
+//     rcMsg->rssi = (uint8_t)255;   
+// }
 
 
 #ifdef MATLAB_MEX_FILE
