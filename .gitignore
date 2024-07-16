@@ -1,6 +1,5 @@
 # matlab & simulink
 **/*.mat
-**/*.xml
 **/*.slxc
 **/*.slprj
 /slprj
