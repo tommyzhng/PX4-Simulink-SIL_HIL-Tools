@@ -66,7 +66,7 @@ static void mdlInitializeSizes(SimStruct *S)
 
 static void mdlInitializeSampleTimes(SimStruct *S)
 {
-    ssSetSampleTime(S, 0, 0.004);
+    ssSetSampleTime(S, 0, INHERITED_SAMPLE_TIME);
     ssSetOffsetTime(S, 0, 0.0);
     ssSetModelReferenceSampleTimeDefaultInheritance(S);
 }
@@ -122,9 +122,6 @@ static void mdlOutputs(SimStruct *S, int_T tid)
         // send the data
         real_T *gpsBuffer = ssGetOutputPortRealSignal(S, 0); 
         std::copy(buffer, buffer + sendBytesLength, gpsBuffer);
-        real_T *sendBytesLengthPtr = ssGetOutputPortRealSignal(S, 1);
-        sendBytesLengthPtr[0] = static_cast<real_T>(sendBytesLength);
-
     }
     catch (const std::exception &e){
         errorMsg = std::string(e.what());
