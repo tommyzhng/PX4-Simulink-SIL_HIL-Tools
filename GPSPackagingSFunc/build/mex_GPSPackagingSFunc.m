@@ -1,0 +1,1 @@
+mex('-outdir',fullfile(blocksetroot,'GPSPackagingSFunc\mex') ,'-g',fullfile(blocksetroot,'GPSPackagingSFunc\src\GPSPackagingSFunc.cpp'),['-I' fullfile(blocksetroot,'GPSPackagingSFunc\src')], ['-I' fullfile(blocksetroot, 'common\include')])

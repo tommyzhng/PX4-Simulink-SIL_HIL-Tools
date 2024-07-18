@@ -1,0 +1,1 @@
+mex('-outdir',fullfile(blocksetroot,'IMUPackagingSFunc\mex') ,'-g',fullfile(blocksetroot,'IMUPackagingSFunc\src\IMUPackagingSFunc.cpp'),['-I' fullfile(blocksetroot,'IMUPackagingSFunc\src')],['-I' fullfile(blocksetroot, 'common\include')])
