@@ -61,7 +61,7 @@ static void mdlInitializeSizes(SimStruct *S)
 
 static void mdlInitializeSampleTimes(SimStruct *S)
 {
-    ssSetSampleTime(S, 0, INHERITED_SAMPLE_TIME);
+    ssSetSampleTime(S, 0, 0.004);
     ssSetOffsetTime(S, 0, 0.0);
     ssSetModelReferenceSampleTimeDefaultInheritance(S);
 }
@@ -186,12 +186,8 @@ void CreateHeartbeatMessage(mavlink_heartbeat_t *heartbeatMsg)
     heartbeatMsg->custom_mode = (uint32_t)0;
 }
 
-#if defined(MATLAB_MEX_FILE)
-
-#ifdef  MATLAB_MEX_FILE    /* Is this file being compiled as a MEX-file? */
-#include "simulink.c"      /* MEX-file interface mechanism */
+#ifdef MATLAB_MEX_FILE
+#include "simulink.c"
 #else
-#include "cg_sfun.h"       /* Code generation registration function */
-#endif
-
+#include "cg_sfun.h"
 #endif

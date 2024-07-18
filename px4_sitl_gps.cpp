@@ -66,7 +66,7 @@ static void mdlInitializeSizes(SimStruct *S)
 
 static void mdlInitializeSampleTimes(SimStruct *S)
 {
-    ssSetSampleTime(S, 0, INHERITED_SAMPLE_TIME);
+    ssSetSampleTime(S, 0, 0.004);
     ssSetOffsetTime(S, 0, 0.0);
     ssSetModelReferenceSampleTimeDefaultInheritance(S);
 }
@@ -122,6 +122,8 @@ static void mdlOutputs(SimStruct *S, int_T tid)
         // send the data
         real_T *gpsBuffer = ssGetOutputPortRealSignal(S, 0); 
         std::copy(buffer, buffer + sendBytesLength, gpsBuffer);
+        real_T *sendBytesLengthPtr = ssGetOutputPortRealSignal(S, 1);
+        sendBytesLengthPtr[0] = static_cast<real_T>(sendBytesLength);
 
     }
     catch (const std::exception &e){
@@ -165,12 +167,8 @@ void CreateHILGPSMessage(mavlink_hil_gps_t *gpsMsg, const real_T* const time_use
 }
 
 
-#if defined(MATLAB_MEX_FILE)
-
-#ifdef  MATLAB_MEX_FILE    /* Is this file being compiled as a MEX-file? */
-#include "simulink.c"      /* MEX-file interface mechanism */
+#ifdef MATLAB_MEX_FILE
+#include "simulink.c"
 #else
-#include "cg_sfun.h"       /* Code generation registration function */
-#endif
-
+#include "cg_sfun.h"
 #endif
